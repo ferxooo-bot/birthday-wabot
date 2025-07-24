@@ -229,7 +229,7 @@ def get_datos_fechasCumple():
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, nombre, numero,fecha_nacimiento FROM contactos")
+        cursor.execute("SELECT id, nombre, numero,fecha_nacimiento FROM contactos ORDER BY id DESC")
 
         return cursor.fetchall()
     except sqlite3.Error as e:

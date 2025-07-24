@@ -1,10 +1,73 @@
+from tkinter.constants import COMMAND
 import customtkinter as ctk
 from tkcalendar import DateEntry # Importa DateEntry de tkcalendar
 import sys
 import os
+from tkinter import messagebox
 
 from models import mensaje
-from views import main_view 
+from views import main_view
+from datetime import date
+
+
+def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame):
+
+    numero = entry_numero.get()
+    nombre = entry_nombre.get()
+    fecha = entry_fecha.get()
+
+    numero = "+57" + numero
+
+    print(f"DEBUG: Guardando - Nombre: {nombre}, Número: {numero}, Fecha: {fecha}")
+
+    if not nombre or not numero or not fecha:
+        messagebox.showinfo("Error","Ingrese los datos")
+        return 
+
+    se_guardo = mensaje.agregar_contactos_base(numero, nombre, fecha)
+    
+    if se_guardo:
+        messagebox.showinfo("Éxito", "El mensaje se guardó correctamente")
+        entry_numero.delete(0,"end")
+        entry_nombre.delete(0,"end")
+        entry_fecha.set_date(date.today())
+        mostrar_contactos_guardados(log_frame)
+        
+    else:
+        messagebox.showinfo("Error", "El mensaje no se guardó")
+
+  
+def mostrar_contactos_guardados(log_frame):
+    # Limpiar contenido anterior del frame
+    for widget in log_frame.winfo_children():
+        widget.destroy()
+
+    # Obtener los contactos guardados desde la base de datos
+    contactos_guardados = mensaje.get_datos_fechasCumple()
+    print("DEBUG contactos_guardados:", contactos_guardados)
+
+    # Encabezados de la tabla
+    headers = ["ID", "Nombre", "Número", "Fecha de Nacimiento"]
+    for col, header in enumerate(headers):
+        label = ctk.CTkLabel(log_frame, text=header, font=ctk.CTkFont(weight="bold"))
+        label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
+        log_frame.grid_columnconfigure(col, weight=1)
+
+    # Mostrar cada fila de contacto
+    for row_index, fila in enumerate(contactos_guardados, start=1):
+        for col_index, valor in enumerate(fila):
+            valor_str = str(valor) if valor is not None else ""
+            label = ctk.CTkLabel(
+                log_frame,
+                text=valor_str[:100] + "..." if len(valor_str) > 103 else valor_str,
+                anchor="w",
+                wraplength=200
+            )
+            label.grid(row=row_index, column=col_index, padx=5, pady=2, sticky="ew")
+
+
+
+
 
 def solo_numeros(texto):
     return texto.isdigit() or texto == ""
@@ -97,6 +160,7 @@ def mostrar_contactos(container, cambiar_vista, app):
         text="Guardar Contacto",       # El texto que mostrará el botón
         height=40,                     # Altura del botón
         font=ctk.CTkFont(size=16, weight="bold"), # Estilo de fuente del texto
+        command=lambda: guardar_contacto(entry_numero, entry_nombre, entry_fecha ,log_frame)
 
     )
     
@@ -113,33 +177,18 @@ def mostrar_contactos(container, cambiar_vista, app):
     border_color="#2ecc71",    # Opcional: un borde verde para destacar
     corner_radius=8            # Bordes redondeados
 )
-    log_data = mensaje.get_log() 
+    log_data = mensaje.get_datos_fechasCumple()
 
     print("DEBUG log_data:", log_data)
     # right label
 
     # Crear un Scrollable Frame dentro de right_column_frame
-    log_frame = ctk.CTkScrollableFrame(right_column_frame, label_text="Registros de envío")
+    log_frame = ctk.CTkScrollableFrame(right_column_frame, label_text="")
     log_frame.pack(fill="x", expand=True, padx=10, pady=10)  # Solo expansión horizontal
 
-    # Crear encabezados (una fila con los títulos de las columnas)
-    headers = ["ID", "Nombre", "Número", "Mensaje", "Fecha", "Estado", "Detalle"]
-    for col, header in enumerate(headers):
-        label = ctk.CTkLabel(log_frame, text=header, font=ctk.CTkFont(weight="bold"))
-        label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
-        log_frame.grid_columnconfigure(col, weight=1)  # Esto permite que se expanda horizontalmente
+    mostrar_contactos_guardados(log_frame)
 
-    # Mostrar los datos del log
-    for row_index, fila in enumerate(log_data, start=1):  # empieza en 1 por los headers
-        for col_index, valor in enumerate(fila):
-            valor_str = str(valor) if valor is not None else ""
-            label = ctk.CTkLabel(
-                log_frame,
-                text=valor_str[:100] + "..." if len(valor_str) > 103 else valor_str,  # Cortar texto largo
-                anchor="w",
-                wraplength=200
-            )
-            label.grid(row=row_index, column=col_index, padx=5, pady=2, sticky="ew")  # sticky ew para expansión
+
     #agregar a la interfaz
     # 
     label_nombre.grid(row=0, column=0, padx=10, pady=10, sticky="e")

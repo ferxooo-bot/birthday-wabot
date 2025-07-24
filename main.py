@@ -5,9 +5,12 @@ import sys
 
 import customtkinter as ctk
 from views import main_view
+from models import mensaje
 
  
 def main():
+    mensaje.crear_base()
+    
     app = ctk.CTk()
     app.title("Mi Aplicación")
     app.geometry("500x400")
