@@ -3,14 +3,38 @@ import customtkinter as ctk
 from tkcalendar import DateEntry # Importa DateEntry de tkcalendar
 import sys
 import os
-from tkinter import messagebox
+from tkinter import Label, messagebox
 
 from models import mensaje
 from views import main_view
 from datetime import date
 
+from tkinter import Menu
 
-def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame):
+
+def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha):
+    #funcione spara realizar acciones    
+    def eliminar():
+        confirmar = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Estás seguro de que deseas eliminar a '{nombre}' ({numero})?"
+        )
+        if confirmar:
+            mensaje.eliminar_contacto_por_numero(numero)
+            mostrar_contactos_guardados(log_frame,main_view)
+            
+    def modificar():
+        input
+    # creo el menu
+
+     
+    menu = Menu(log_frame, tearoff=0)
+    menu.add_command(label="Modificar",command=modificar)
+    menu.add_command(label="Eliminar",command=eliminar)
+    return menu 
+
+        
+def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame ,cambiar_vista):
 
     numero = entry_numero.get()
     nombre = entry_nombre.get()
@@ -31,13 +55,13 @@ def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame):
         entry_numero.delete(0,"end")
         entry_nombre.delete(0,"end")
         entry_fecha.set_date(date.today())
-        mostrar_contactos_guardados(log_frame)
+        mostrar_contactos_guardados(log_frame,cambiar_vista)
         
     else:
         messagebox.showinfo("Error", "El mensaje no se guardó")
 
   
-def mostrar_contactos_guardados(log_frame):
+def mostrar_contactos_guardados(log_frame, cambiar_vista):
     # Limpiar contenido anterior del frame
     for widget in log_frame.winfo_children():
         widget.destroy()
@@ -55,6 +79,9 @@ def mostrar_contactos_guardados(log_frame):
 
     # Mostrar cada fila de contacto
     for row_index, fila in enumerate(contactos_guardados, start=1):
+        widgets_fila = []
+        id_contacto, nombre, numero, fecha = fila
+
         for col_index, valor in enumerate(fila):
             valor_str = str(valor) if valor is not None else ""
             label = ctk.CTkLabel(
@@ -64,10 +91,33 @@ def mostrar_contactos_guardados(log_frame):
                 wraplength=200
             )
             label.grid(row=row_index, column=col_index, padx=5, pady=2, sticky="ew")
+            widgets_fila.append(label)
 
+        # Función para manejar el clic derecho
+        def on_right_click(e, id=id_contacto, nombre=nombre, numero=numero, fecha=fecha, widgets=widgets_fila):
+            # Resaltar la fila
+            for w in widgets:
+                w.configure(fg_color="gray30")  # resaltado
 
+            # Crear el menú contextual
+            menu = crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha)
 
+            # Cuando el menú se cierre (unmap), quitamos el resaltado
+            def quitar_resaltado(event):
+                for w in widgets:
+                    w.configure(fg_color="transparent")
 
+            menu.bind("<Unmap>", quitar_resaltado)
+
+            # Mostrar el menú en posición del clic
+            menu.tk_popup(e.x_root, e.y_root)
+
+        for widget in widgets_fila:
+            widget.bind(
+                "<Button-3>",
+                lambda e, id=id_contacto, nombre=nombre, numero=numero, fecha=fecha, widgets=widgets_fila:
+                    on_right_click(e, id, nombre, numero, fecha, widgets)
+            )
 
 def solo_numeros(texto):
     return texto.isdigit() or texto == ""
@@ -160,7 +210,7 @@ def mostrar_contactos(container, cambiar_vista, app):
         text="Guardar Contacto",       # El texto que mostrará el botón
         height=40,                     # Altura del botón
         font=ctk.CTkFont(size=16, weight="bold"), # Estilo de fuente del texto
-        command=lambda: guardar_contacto(entry_numero, entry_nombre, entry_fecha ,log_frame)
+        command=lambda: guardar_contacto(entry_numero, entry_nombre, entry_fecha ,log_frame,cambiar_vista)
 
     )
     
@@ -186,7 +236,7 @@ def mostrar_contactos(container, cambiar_vista, app):
     log_frame = ctk.CTkScrollableFrame(right_column_frame, label_text="")
     log_frame.pack(fill="x", expand=True, padx=10, pady=10)  # Solo expansión horizontal
 
-    mostrar_contactos_guardados(log_frame)
+    mostrar_contactos_guardados(log_frame,cambiar_vista)
 
 
     #agregar a la interfaz
