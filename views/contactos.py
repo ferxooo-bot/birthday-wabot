@@ -11,6 +11,14 @@ from datetime import date
 
 from tkinter import Menu
 
+def filtrar(button, log_frame, cambiar_vista):
+    
+    texto = button.get().lower().strip()
+    todos = mensaje.get_datos_fechasCumple()
+    filtrados = [c for c in todos if texto in c[1].lower() or texto in c[2]]
+    mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=filtrados)
+
+
 
 def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha):
     #funcione spara realizar acciones    
@@ -20,7 +28,7 @@ def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha):
             f"¿Estás seguro de que deseas eliminar a '{nombre}' ({numero})?"
         )
         if confirmar:
-            mensaje.eliminar_contacto_por_numero(numero)
+            mensaje.eliminar_contacto_por_id(id)
             mostrar_contactos_guardados(log_frame,main_view)
             
     def modificar():
@@ -61,13 +69,13 @@ def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame ,cambia
         messagebox.showinfo("Error", "El mensaje no se guardó")
 
   
-def mostrar_contactos_guardados(log_frame, cambiar_vista):
+def mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=None):
     # Limpiar contenido anterior del frame
     for widget in log_frame.winfo_children():
         widget.destroy()
 
     # Obtener los contactos guardados desde la base de datos
-    contactos_guardados = mensaje.get_datos_fechasCumple()
+    contactos_guardados = contactos if contactos is not None else mensaje.get_datos_fechasCumple()       
     print("DEBUG contactos_guardados:", contactos_guardados)
 
     # Encabezados de la tabla
@@ -227,12 +235,23 @@ def mostrar_contactos(container, cambiar_vista, app):
     border_color="#2ecc71",    # Opcional: un borde verde para destacar
     corner_radius=8            # Bordes redondeados
 )
+
     log_data = mensaje.get_datos_fechasCumple()
 
     print("DEBUG log_data:", log_data)
     # right label
+    
+    entry_busqueda = ctk.CTkEntry(
+        right_column_frame,
+        placeholder_text="Buscar por nombre o número",
+        width=400
+    )
+    entry_busqueda.pack(pady=(10, 0))
+    
+    entry_busqueda.bind("<KeyRelease>", lambda e: filtrar(entry_busqueda, log_frame, cambiar_vista))
 
-    # Crear un Scrollable Frame dentro de right_column_frame
+    
+     # Crear un Scrollable Frame dentro de right_column_frame
     log_frame = ctk.CTkScrollableFrame(right_column_frame, label_text="")
     log_frame.pack(fill="x", expand=True, padx=10, pady=10)  # Solo expansión horizontal
 
@@ -254,3 +273,8 @@ def mostrar_contactos(container, cambiar_vista, app):
     boton_enviar.grid(row=3, column=0,padx=5, pady=10, sticky="ew",columnspan=2)
 
     boton_volver.grid(row=4, column=0,padx=5, pady=10, sticky="ew",columnspan=2)
+
+
+
+
+    

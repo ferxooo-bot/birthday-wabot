@@ -101,12 +101,12 @@ def crear_base():
                            numero
                            TEXT
                            NOT
-                           NULL
-                           UNIQUE,
+                           NULL,
                            fecha_nacimiento
                            TEXT
                            NOT
-                           NULL
+                           NULL,
+                           UNIQUE(nombre, numero, fecha_nacimiento)
                        )
                        ''')
         # Crea tabla para el log
@@ -143,31 +143,31 @@ def crear_base():
             # Cierra la conexión
 
 
-def eliminar_contacto_por_numero(numero_a_eliminar):
+def eliminar_contacto_por_id(id):
     conn = None
     try:
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
 
         # Eliminar el contacto donde el número coincida
-        cursor.execute("DELETE FROM contactos WHERE numero = ?", (str(numero_a_eliminar),))
+        cursor.execute("DELETE FROM contactos WHERE id = ?", (str(id),))
         conn.commit()
 
         if cursor.rowcount > 0:
-            print(f"Contacto con número '{numero_a_eliminar}' eliminado exitosamente.")
+            print(f"Contacto con número '{id}' eliminado exitosamente.")
             return True
         else:
-            print(f"No se encontró ningún contacto con el número '{numero_a_eliminar}' para eliminar.")
+            print(f"No se encontró ningún contacto con el id '{id}' para eliminar.")
             return False
     except sqlite3.Error as e:
-        print(f"Error al eliminar el contacto '{numero_a_eliminar}': {e}")
+        print(f"Error al eliminar el contacto '{id}': {e}")
         return False
     finally:
         if conn:
             conn.close()
 
 
-def modificar_contacto(numero , fecha=None, nombre=None):
+def modificar_contacto(id, numero=None, fecha=None, nombre=None):
 
 
     # --- 2. Validar formato del número de teléfono ---
@@ -180,13 +180,16 @@ def modificar_contacto(numero , fecha=None, nombre=None):
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
 
-        if nombre is None and fecha is None:
+        if nombre is None and fecha is None and numero is None:
             print("ADVERTENCIA: No se especificó ningún campo para modificar (nombre o fecha).")
             return False
 
         updates = []  # Lista para guardar las partes de la consulta SET (ej. "nombre = ?")
         params = []  # Lista para guardar los valores que irán en los placeholders (?)
-
+        if numero is not None:
+            updates.append("numero = ?")
+            params.append(numero)
+            
         if nombre is not None :
             updates.append("nombre = ?")
             params.append(nombre)
@@ -200,15 +203,15 @@ def modificar_contacto(numero , fecha=None, nombre=None):
             return False
 
 
-        params.append(numero)  # Agrega el número para la cláusula WHERE
+        params.append(id)  # Agrega el id para la cláusula WHERE
 
-        query = f"UPDATE contactos SET {', '.join(updates)} WHERE numero = ?"
+        query = f"UPDATE contactos SET {', '.join(updates)} WHERE id = ?"
 
         cursor.execute(query, tuple(params))
         conn.commit()
 
         if cursor.rowcount > 0:
-            print(f"Contacto con número '{numero}' modificado exitosamente.")
+            print(f"Contacto con número '{id, nombre}' modificado exitosamente.")
 
             return True
         else:
