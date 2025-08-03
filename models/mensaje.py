@@ -13,6 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from models.validaciones import *
 
 
 def obtener_cumpleaños():
@@ -24,7 +25,7 @@ def obtener_cumpleaños():
 
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT nombre, numero, fecha_nacimiento FROM contactos WHERE STRFTIME('%m', fecha_nacimiento) = ? AND STRFTIME('%d', fecha_nacimiento) = ?",
+        cursor.execute("SELECT id, nombre, numero, fecha_nacimiento FROM contactos WHERE STRFTIME('%m', fecha_nacimiento) = ? AND STRFTIME('%d', fecha_nacimiento) = ?",
                        (mes_actual,dia_actual)
                        )
         cumpleañeros = cursor.fetchall()
@@ -39,20 +40,17 @@ def obtener_cumpleaños():
 
 
 def agregar_contactos_base(numero, nombre,fecha):
-
-    # --- 1. Validar que nombre y fecha no estén vacíos ---
-    if not nombre or not fecha:
-        print(f"ADVERTENCIA: Nombre o fecha están vacíos para el contacto '{nombre}' ({numero}). Contacto no agregado.")
-        return False
-
+    # validar que los campos no esten vacios
+    if not nombre:
+        return False, "Falta el nombre"
+    if not numero:
+        return False, "Falta el número"
+    if not fecha:
+        return False, "Falta la fecha"
+    
     # --- 2. Validar formato del número de teléfono ---
-    # Patrón: Empieza con '+', seguido de 1 a 3 dígitos (código de país),
-    # y luego 7 a 15 dígitos (número local).
-    # Este patrón es una simplificación y cubre la mayoría de casos.
-    if not re.fullmatch(r'^\+\d{1,3}\d{10}$', numero):
-        print(f"ADVERTENCIA: El número '{numero}' no tiene el formato internacional correcto (ej. +573130000000). Contacto no agregado.")
-        return False
-
+    if not validar_numero(numero):
+        return False, "El número no tiene el formato internacional correcto (ej: +573001234567)"
 
     try:
         conn = sqlite3.connect('.venv/fechasCumple.db')
@@ -64,13 +62,14 @@ def agregar_contactos_base(numero, nombre,fecha):
 
         if cursor.rowcount > 0: # rowcount > 0 significa que se insertó una fila nueva
             print(f"Contacto '{nombre}' ({numero}) agregado exitosamente.")
-            return True
+            return True ,f"El contacto {nombre} se guardó correctamente"
         else:
             print(f"Contacto '{nombre}' ({numero}) ya existe en la base de datos. Ignorado.")
+            return False, f"Contacto '{nombre}' ({numero}) ya existe en la base de datos. Ignorado."
     except sqlite3.Error as e:
         print(f"Error al agregar el contacto {nombre}: {e}")
         print(e)
-        return False
+        return False,f"Error al agregar el contacto {nombre}" 
 
     finally:
         if conn: conn.close()
@@ -182,7 +181,7 @@ def modificar_contacto(id, numero=None, fecha=None, nombre=None):
 
         if nombre is None and fecha is None and numero is None:
             print("ADVERTENCIA: No se especificó ningún campo para modificar (nombre o fecha).")
-            return False
+            return False ,"No se especificó ningún campo para modificar (nombre o fecha)."
 
         updates = []  # Lista para guardar las partes de la consulta SET (ej. "nombre = ?")
         params = []  # Lista para guardar los valores que irán en los placeholders (?)
@@ -198,10 +197,6 @@ def modificar_contacto(id, numero=None, fecha=None, nombre=None):
             updates.append("fecha_nacimiento = ?")
             params.append(fecha)
 
-        if not updates:
-            print("ADVERTENCIA: No hay campos para actualizar.")
-            return False
-
 
         params.append(id)  # Agrega el id para la cláusula WHERE
 
@@ -213,13 +208,13 @@ def modificar_contacto(id, numero=None, fecha=None, nombre=None):
         if cursor.rowcount > 0:
             print(f"Contacto con número '{id, nombre}' modificado exitosamente.")
 
-            return True
+            return True, f"Contacto con número '{id, nombre}' modificado exitosamente."
         else:
             print(f"No se encontró ningún contacto con el número '{numero}' para modificar.")
-            return False
+            return False,f"No se encontró ningún contacto con el número '{numero}' para modificar."
     except sqlite3.Error as e:
         print(f"ERROR: Error al modificar el contacto '{numero}': {e}")
-        return False
+        return False,f"ERROR: Error al modificar el contacto '{numero}': {e}"
     finally:
         if conn:
             conn.close()
@@ -248,7 +243,7 @@ def get_log():
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, nombre, numero, mensaje, fecha_hora_envio, estado, detalle  FROM log")
+        cursor.execute("SELECT id, nombre, numero, mensaje, fecha_hora_envio, estado, detalle FROM log ORDER BY fecha_hora_envio DESC")
         return cursor.fetchall()
 
     except sqlite3.Error as e:
@@ -258,13 +253,13 @@ def get_log():
         if conn:
             conn.close()
 
-def agregar_log(nombre, numero, fecha_envio, mensaje, estado, detalle):
+def agregar_log(id, nombre, numero, fecha_envio, mensaje, estado, detalle):
     conn = None
     try:
         conn = sqlite3.connect('.venv/fechasCumple.db')
         cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO log (nombre, numero, mensaje, fecha_hora_envio, estado, detalle) VALUES(?, ?, ?, ?, ?, ?)",
-                       (nombre, numero,  mensaje, fecha_envio, estado, detalle))
+        cursor.execute("INSERT OR IGNORE INTO log (id, nombre, numero, mensaje, fecha_hora_envio, estado, detalle) VALUES(?,?, ?, ?, ?, ?, ?)",
+                       (id,nombre, numero,  mensaje, fecha_envio, estado, detalle))
         conn.commit()
 
         if (cursor.rowcount > 0):
@@ -278,7 +273,7 @@ def agregar_log(nombre, numero, fecha_envio, mensaje, estado, detalle):
         if conn:conn.close()
 
 
-def enviar_mensaje(driver, numero, nombre, mensaje):
+def enviar_mensaje(id,driver, numero, nombre, mensaje):
     # Hacer la url segura para el navegador
     
     encoded_message = urllib.parse.quote(mensaje)
@@ -297,30 +292,33 @@ def enviar_mensaje(driver, numero, nombre, mensaje):
         driver.get(wa_url)
 
         message_input_field = WebDriverWait(driver, 25).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, '[aria-label="Escribe un mensaje"]'))
+            EC.presence_of_element_located((By.CSS_SELECTOR, '[contenteditable="true"][role="textbox"]'))
         )
-        print("DEBUG: Se encontro el cuadro de texto")
 
-        send_button = WebDriverWait(driver, 15).until(
-            # Usando By.CSS_SELECTOR y el atributo Enviar
-            EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[aria-label="Enviar"]'))
-            
+
+        button = WebDriverWait(driver, 15).until(
+            EC.element_to_be_clickable((
+                By.CSS_SELECTOR,
+                'button[data-icon="wds-ic-send-filled"], button[aria-label="Enviar"], button[aria-label="Send"]'
+            ))
         )
+
+
         print("DEBUG: Se encontro el boton enviar")
-        send_button.click() 
+        button.click() 
         time.sleep(3)
-        agregar_log(nombre, numero,fecha, encoded_message,"Enviado" , "")
+        agregar_log(id,nombre, numero,fecha, mensaje,"Enviado" , "")
         return True
 
 
 
     except Exception as e:
         print(f"ERROR: Falló el envío de mensaje. Detalle: {e}")
-        agregar_log(nombre, numero, fecha, encoded_message,"No Enviado" , e)
+        agregar_log(id, nombre, numero, fecha, mensaje, "No Enviado" , e)
         return False
 
 
-def verificar_envio_exitoso_hoy(numero_verificar):
+def verificar_envio_exitoso_hoy(id):
 
     try:
         conn = sqlite3.connect('.venv/fechasCumple.db')
@@ -331,12 +329,14 @@ def verificar_envio_exitoso_hoy(numero_verificar):
         cursor.execute("""
             SELECT COUNT(*)
             FROM log
-            WHERE numero = ?
+            WHERE id = ?
             AND estado = 'Enviado'
             AND STRFTIME('%Y-%m-%d', fecha_hora_envio) = ?
-        """, (numero_verificar,fecha_hoy))
+        """, (id,fecha_hoy))
         count = cursor.fetchone()[0]
+        
         print("DEBUG : Se verifico y ya esta en el log")
+        print(count)
         return count > 0
 
     except sqlite3.Error as e:

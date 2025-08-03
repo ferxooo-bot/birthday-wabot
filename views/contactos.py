@@ -3,24 +3,122 @@ import customtkinter as ctk
 from tkcalendar import DateEntry # Importa DateEntry de tkcalendar
 import sys
 import os
+import re
 from tkinter import Label, messagebox
 
 from models import mensaje
 from views import main_view
 from datetime import date
+from CTkDatePicker.ctk_date_picker import CTkDatePicker
+
+
 
 from tkinter import Menu
 
-def filtrar(button, log_frame, cambiar_vista):
+
+def verificar_numero(numero_verificar):
+     return bool(re.fullmatch(r'^\+\d{6,15}$', numero_verificar))    
+
+
+
+def ven_modificar_contacto(parent, id_contacto, nombre_actual, numero_actual, fecha_actual, callback_actualizar):
+    ventana = ctk.CTkToplevel(parent)
     
-    texto = button.get().lower().strip()
+    ventana.title("Modificar Contacto")
+    ventana.geometry("400x300")
+    ventana.grab_set()
+
+    estilo_entry = {
+        "height": 35,
+        "width": 200,
+        "font": ctk.CTkFont(size=15),
+        "fg_color": ("white", "gray20"),
+        "text_color": ("black", "white"),
+        "placeholder_text_color": "gray60",
+        "border_width": 2,
+        "corner_radius": 8,
+        "border_color": "black",
+    }
+
+    estilo_label = {
+        "font": ctk.CTkFont(size=18, weight="bold"),
+        "text_color": ("black", "white"),
+        "anchor": "w"
+    }
+
+    # Contenedor
+
+    frame = ctk.CTkFrame(ventana, fg_color="transparent")
+    frame.pack(expand=True, pady=20)
+
+    # Nombre
+    label_nombre = ctk.CTkLabel(frame, text="Nombre", **estilo_label)
+    label_nombre.pack(pady=(5, 0))
+    entry_nombre = ctk.CTkEntry(frame, **estilo_entry)
+    entry_nombre.insert(0, nombre_actual)
+    entry_nombre.pack(pady=5)
+
+    # Número
+    label_numero = ctk.CTkLabel(frame, text="Número", **estilo_label)
+    label_numero.pack(pady=(10, 0))
+    entry_numero = ctk.CTkEntry(frame, **estilo_entry)
+    entry_numero.insert(0, numero_actual)
+   
+    entry_numero.pack(pady=5)
+
+    # Fecha
+
+
+    entry_fecha = CTkDatePicker(frame)
+    entry_fecha.set_date_format("%Y-%m-%d")
+    entry_fecha.set_allow_manual_input(True)
+    entry_fecha.set_date(str(fecha_actual))
+    entry_fecha.set_localization("es_CO.UTF-8")
+
+    entry_fecha.pack(pady=5)
+
+    def guardar_modificacion():
+        nuevo_nombre = entry_nombre.get()
+        nuevo_numero = entry_numero.get()
+        nueva_fecha = entry_fecha.get_date()
+
+        if not nuevo_nombre.strip() or not nuevo_numero.strip():
+            messagebox.showwarning("Datos incompletos", "Nombre y número no pueden estar vacíos.")
+            return
+
+        
+        confirmacion = messagebox.askyesno(
+            "Confirmar modificación?",
+            f"¿Deseas modificar el contacto a:\n\nNombre: {nuevo_nombre}\nNúmero: {nuevo_numero}\nFecha: {nueva_fecha}?"
+        )
+
+        if not confirmacion:
+            return
+        
+        exito, msg = mensaje.modificar_contacto(id_contacto, numero=nuevo_numero, nombre=nuevo_nombre, fecha=nueva_fecha)
+
+        if exito:
+            messagebox.showinfo("Éxito",msg)
+            callback_actualizar()
+            ventana.destroy()
+        else:
+            messagebox.showinfo("Error",msg)
+
+        
+    boton_modificar = ctk.CTkButton(ventana, text="Guardar Cambios", command=guardar_modificacion)
+    boton_modificar.pack(pady=20)
+        
+
+def filtrar(entry_text, log_frame, cambiar_vista):
+    
+    texto = entry_text.get().lower().strip()
     todos = mensaje.get_datos_fechasCumple()
     filtrados = [c for c in todos if texto in c[1].lower() or texto in c[2]]
     mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=filtrados)
 
 
 
-def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha):
+def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha, parent):
     #funcione spara realizar acciones    
     def eliminar():
         confirmar = messagebox.askyesno(
@@ -32,7 +130,15 @@ def crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha):
             mostrar_contactos_guardados(log_frame,main_view)
             
     def modificar():
-        input
+        ven_modificar_contacto(
+            parent,
+            id,
+            nombre,
+            numero,
+            fecha,
+            lambda: mostrar_contactos_guardados(log_frame, cambiar_vista, parent=parent)
+        )        
+        
     # creo el menu
 
      
@@ -46,30 +152,22 @@ def guardar_contacto(entry_numero, entry_nombre,  entry_fecha, log_frame ,cambia
 
     numero = entry_numero.get()
     nombre = entry_nombre.get()
-    fecha = entry_fecha.get()
+    fecha = entry_fecha.get_date()
 
-    numero = "+57" + numero
+    exito, mensaje_resultado = mensaje.agregar_contactos_base(numero, nombre, fecha)
 
-    print(f"DEBUG: Guardando - Nombre: {nombre}, Número: {numero}, Fecha: {fecha}")
-
-    if not nombre or not numero or not fecha:
-        messagebox.showinfo("Error","Ingrese los datos")
-        return 
-
-    se_guardo = mensaje.agregar_contactos_base(numero, nombre, fecha)
-    
-    if se_guardo:
-        messagebox.showinfo("Éxito", "El mensaje se guardó correctamente")
-        entry_numero.delete(0,"end")
-        entry_nombre.delete(0,"end")
+        # Mostrar resultado
+    if exito:
+        messagebox.showinfo("Éxito", mensaje_resultado)
+        entry_numero.delete(0, "end")
+        entry_nombre.delete(0, "end")
         entry_fecha.set_date(date.today())
-        mostrar_contactos_guardados(log_frame,cambiar_vista)
-        
+        mostrar_contactos_guardados(log_frame, cambiar_vista)
     else:
-        messagebox.showinfo("Error", "El mensaje no se guardó")
+         messagebox.showinfo("Error", mensaje_resultado)
 
-  
-def mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=None):
+         
+def mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=None,parent=None):
     # Limpiar contenido anterior del frame
     for widget in log_frame.winfo_children():
         widget.destroy()
@@ -107,8 +205,8 @@ def mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=None):
             for w in widgets:
                 w.configure(fg_color="gray30")  # resaltado
 
-            # Crear el menú contextual
-            menu = crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha)
+            # Crear el menú contextual?
+            menu = crear_menu_contextual(log_frame, cambiar_vista, id, nombre, numero, fecha, parent)
 
             # Cuando el menú se cierre (unmap), quitamos el resaltado
             def quitar_resaltado(event):
@@ -128,7 +226,7 @@ def mostrar_contactos_guardados(log_frame, cambiar_vista, contactos=None):
             )
 
 def solo_numeros(texto):
-    return texto.isdigit() or texto == ""
+    return bool(re.fullmatch(r'\+?\d*', texto)) or texto == ""
 
 def mostrar_contactos(container, cambiar_vista, app):  
          # 1. Configuración básica de la ventana
@@ -202,17 +300,11 @@ def mostrar_contactos(container, cambiar_vista, app):
     )
 
 
-    entry_fecha = DateEntry(
-        contenido_frame,
-        selectmode='day',
-        date_pattern='yyyy-mm-dd',
-        background="gray20",  # Color de fondo
-        foreground="white",  # Texto
-        bordercolor="black",  # Bordes
-        font=ctk.CTkFont(size=20),  # <-- ESTO ES LO QUE CONTROLAS
-    )
-
-
+    entry_fecha = CTkDatePicker(contenido_frame)
+    entry_fecha.set_date_format("%Y-%m-%d")
+    entry_fecha.set_allow_manual_input(True)
+    entry_fecha.set_localization("es_CO.UTF-8")
+    entry_fecha.set_date(date.today())
     boton_enviar = ctk.CTkButton(
         contenido_frame,        # El widget padre donde se insertará el botón
         text="Guardar Contacto",       # El texto que mostrará el botón
@@ -255,7 +347,7 @@ def mostrar_contactos(container, cambiar_vista, app):
     log_frame = ctk.CTkScrollableFrame(right_column_frame, label_text="")
     log_frame.pack(fill="x", expand=True, padx=10, pady=10)  # Solo expansión horizontal
 
-    mostrar_contactos_guardados(log_frame,cambiar_vista)
+    mostrar_contactos_guardados(log_frame,cambiar_vista,parent=app)
 
 
     #agregar a la interfaz
