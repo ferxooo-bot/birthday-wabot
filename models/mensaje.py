@@ -5,6 +5,7 @@ import time
 import urllib
 import sqlite3
 from datetime import datetime
+import sys
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -16,14 +17,27 @@ from webdriver_manager.chrome import ChromeDriverManager
 from models.validaciones import *
 
 
+def get_resource_path(relative_path):
+    """Obtiene la ruta absoluta al recurso, funciona en dev y en .exe"""
+    try:
+        # En PyInstaller, _MEIPASS es la carpeta temporal donde pone los recursos
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # En desarrollo usamos la ruta actual del proyecto
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 def obtener_cumpleaños():
     conn = None
     try:
         hoy = datetime.now()
         mes_actual = hoy.strftime('%m')  # Formato 'MM' (ej. '06' para junio)
-        dia_actual = hoy.strftime('%d')  # Formato 'DD' (ej. '03' para el día 3)
-
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        dia_actual = hoy.strftime('%d')  # Formato 'DD' (ej. '03' para el día 3)i
+        
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
+        
         cursor = conn.cursor()
         cursor.execute("SELECT id, nombre, numero, fecha_nacimiento FROM contactos WHERE STRFTIME('%m', fecha_nacimiento) = ? AND STRFTIME('%d', fecha_nacimiento) = ?",
                        (mes_actual,dia_actual)
@@ -53,7 +67,8 @@ def agregar_contactos_base(numero, nombre,fecha):
         return False, "El número no tiene el formato internacional correcto (ej: +573001234567)"
 
     try:
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO contactos (nombre, numero, fecha_nacimiento) VALUES(?, ?, ?)",
         (nombre, numero,fecha)
@@ -79,7 +94,8 @@ def crear_base():
     conn = None
     try :
         # Crea archivo base de datos
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
 
         # crea cursor para ejecutar comandos
         cursor = conn.cursor()
@@ -133,7 +149,17 @@ def crear_base():
                        )
                        ''')
 
+
+        #crear tabla mensaje
+        cursor.execute('''
+                       CREATE TABLE IF NOT EXISTS mensajetxt
+                       (key TEXT PRIMARY KEY,
+                       texto TEXT
+                       )
+                       '''
+        )
         conn.commit()
+        
     except sqlite3.error as e:
         print(f"Error al crear/asegurar las base de datos: {e}")
     finally:
@@ -141,11 +167,54 @@ def crear_base():
             conn.close()
             # Cierra la conexión
 
+def put_mensaje(mensajetext):
+    conn = None
 
+    try:
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("INSERT OR REPLACE INTO mensajetxt (key, texto) VALUES (?,?)",
+                       ("1",mensajetext))
+        conn.commit()
+        return True, "Mensaje guardado correctamente"       
+    except sqlite3.Error as e:
+        print(f"Error al insertar el mensaje: {e}")
+        return False, f"Error al insertar el mensaje: {e}"
+        
+    finally:
+        if conn:
+            conn.close()
+            
+def get_mensaje():
+    conn = None
+
+    try:
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT texto FROM mensajetxt WHERE key = ?", ("1",))
+        resultado = cursor.fetchone()  # Devuelve una tupla o None
+
+        if resultado:
+            return resultado[0]
+        else:
+            return None
+    except sqlite3.Error as e:
+        print(f"Error al obtener el mensaje: {e}")
+        return None       
+    finally:
+        if conn:
+            conn.close() 
+
+        
 def eliminar_contacto_por_id(id):
     conn = None
     try:
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         # Eliminar el contacto donde el número coincida
@@ -176,7 +245,8 @@ def modificar_contacto(id, numero=None, fecha=None, nombre=None):
 
     conn = None
     try:
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         if nombre is None and fecha is None and numero is None:
@@ -224,7 +294,8 @@ def get_datos_fechasCumple():
     conn = None
     try :
 
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)        
         cursor = conn.cursor()
 
         cursor.execute("SELECT id, nombre, numero,fecha_nacimiento FROM contactos ORDER BY id DESC")
@@ -240,7 +311,8 @@ def get_datos_fechasCumple():
 def get_log():
     conn = None
     try :
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         cursor.execute("SELECT id, nombre, numero, mensaje, fecha_hora_envio, estado, detalle FROM log ORDER BY fecha_hora_envio DESC")
@@ -256,7 +328,8 @@ def get_log():
 def agregar_log(id, nombre, numero, fecha_envio, mensaje, estado, detalle):
     conn = None
     try:
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO log (id, nombre, numero, mensaje, fecha_hora_envio, estado, detalle) VALUES(?,?, ?, ?, ?, ?, ?)",
                        (id,nombre, numero,  mensaje, fecha_envio, estado, detalle))
@@ -321,7 +394,8 @@ def enviar_mensaje(id,driver, numero, nombre, mensaje):
 def verificar_envio_exitoso_hoy(id):
 
     try:
-        conn = sqlite3.connect('.venv/fechasCumple.db')
+        db_path = get_resource_path(os.path.join("data", "fechasCumple.db"))
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         fecha_hoy = datetime.now().strftime("%Y-%m-%d")

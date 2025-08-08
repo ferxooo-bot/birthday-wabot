@@ -18,9 +18,7 @@ from models.mensaje import *
 
 
 def enviar_mensajep():
-    mensaje = "¡Feliz cumpleaños, {nombre}! Espero que tengas un día maravilloso lleno de alegría y sorpresas. 🎉🎂"
-
-
+    mensaje = get_mensaje()
     # Define una ruta para el perfil persistente
     home_dir = os.path.expanduser('~')
     #ruta donde se gurda usuario de chorme
@@ -85,3 +83,4 @@ def enviar_mensajep():
 
 
 enviar_mensajep()
+

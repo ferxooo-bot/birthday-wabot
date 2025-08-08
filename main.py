@@ -22,6 +22,17 @@ def main():
     container = ctk.CTkFrame(app)
     container.pack(fill="both", expand=True)
 
+    mensaje_default = "¡Feliz cumpleaños, {nombre}! Espero que tengas un día maravilloso lleno de alegría y sorpresas. 🎉🎂"
+
+    mensaje_guardado = mensaje.get_mensaje()
+    
+    if not mensaje_guardado:  # None o ""
+        mensaje.put_mensaje(mensaje_default)
+        mensajet = mensaje_default
+    print("hola")    
+    print(mensaje_guardado)
+
+    
     # Función que cambia entre vistas
     def cambiar_vista(funcion_vista):
         
